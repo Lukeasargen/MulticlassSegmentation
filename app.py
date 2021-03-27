@@ -23,7 +23,7 @@ SAVE_FOLDER = 'static/uploads/'
 SAMPLE_DATA_FOLDER = 'static/samples/'
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
-MODEL_SAVE_PATH = "runs/demo.pth"
+MODEL_SAVE_PATH = "runs/save/run00159_final.pth"
 
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 SAVE_FOLDER_PATH = os.path.join(CURRENT_DIR_PATH, SAVE_FOLDER)
@@ -57,11 +57,11 @@ def upload():
         elif 'btn_upload' in request.form or 'btn_analysis' in request.form:
             if 'image' not in request.files:
                 error_str = "Failed to upload image."
-                return render_template('index.html', error_str=error_str)
+                return render_template('upload.html', error_str=error_str)
             file = request.files['image']
             if file.filename == "":
                 error_str = "Invalid character in filename."
-                return render_template('index.html', error_str=error_str)
+                return render_template('upload.html', error_str=error_str)
             if file and allowed_file(file.filename):
                 filename = secure_filename(file.filename)
                 upload_name = filename
@@ -71,7 +71,7 @@ def upload():
                 print("Saving {}".format(filename))
             else:
                 error_str = "Invalid file. Allowed types -> png, jpg, jpeg"
-                return render_template('index.html', error_str=error_str)
+                return render_template('upload.html', error_str=error_str)
 
         # Use the model to make a prediction and create the relevant strings
         print("upload_name :", upload_name)
@@ -95,17 +95,19 @@ def upload():
                 class_prob, class_num = torch.max(class_pred, dim=1)  # Top class average probability and label
                 print("class_prob :", class_prob, class_prob.shape)
                 print("class_num :", class_num, class_num.shape)
+                cat_name = model.num_to_cat[int(class_num)]
+                print("cat_name :", cat_name)
                 # Simple rating label
-                rating_str = "{:.06f} % {}".format(float(100*class_prob), model.num_to_cat[int(class_num)])
+                rating_str = "{:.06f} % {}".format(float(100*class_prob), cat_name)
                 print("rating_str :", rating_str)
 
             except Exception as e:
                 print(e)
                 error_str = "Failed to process image."
-                return render_template('index.html', error_str=error_str)
+                return render_template('upload.html', error_str=error_str)
         else:
             error_str = "Failed to load image."
-            return render_template('index.html', error_str=error_str)
+            return render_template('upload.html', error_str=error_str)
 
         # Now the image is through the model and the simple predictions are complete
 
@@ -139,19 +141,20 @@ def upload():
             # overlay_path = os.path.join(SAVE_FOLDER_PATH, overlay_filename)
             # cv2.imwrite(overlay_path, cv2.cvtColor(overlay, cv2.COLOR_RGB2BGR))
             # # Send the path to the created images
-            return render_template('index.html',
+            return render_template('upload.html',
                                     filename=upload_name,
                                     rating=rating_str,
                                     heatmap=heatmap_upload_name,
+                                    cat_name=cat_name,
                                     # overlay=overlay_upload_name
                                     )
         else:  # Normal upload
-            return render_template('index.html',
+            return render_template('upload.html',
                                     filename=upload_name,
                                     rating=rating_str
                                     )
 
-    return render_template('index.html')  # Failure case
+    return render_template('upload.html')  # Failure case
 
 if __name__ == "__main__":
     load_model_global()

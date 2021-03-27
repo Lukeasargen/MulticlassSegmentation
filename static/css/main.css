@@ -1,0 +1,16 @@
+body {
+    background-color: #EAE7DC;
+    font-size: 12px;
+    font-family: sans-serif;
+}
+
+img {
+    max-width: 100%;
+    width: 350px;
+    height: auto;
+    object-fit: contain; 
+}
+
+.image_container {
+    padding: 5px;
+}

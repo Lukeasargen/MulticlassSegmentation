@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block head %}
+<title>Upload</title>
+{% endblock %}
+
+{% block body %}
+<div class="container">
+    <h1>FunnyNet</h1>
+    <h2>Upload an image</h2>
+    <hr>
+
+    <form action="upload" method="POST" enctype="multipart/form-data">
+        <input type="file" name="image" id="image" >
+        <button type="submit" name="btn_upload" value="btn_upload" class="btn btn-primary">Upload</button>
+        <hr>
+        <button type="submit" name="btn_analysis" value="btn_analysis" class="btn btn-primary">Deep Analysis</button>
+        <hr>
+        <button type="submit" name="btn_sample" value="btn_sample" class="btn btn-primary">Click for random sample</button>
+    </form>
+
+    {% if error_str %}
+    <p>{{error_str}}</p>
+    {% endif %}
+
+    {% if filename %}    
+    <h2>{{rating}}</h2>
+    <div class="image_container">
+        <img src={{filename}} >
+    </div>
+    {% endif %}
+
+    {% if heatmap %}
+    <h3>Heatmap of Funny Regions</h3>
+    <div class="image_container">
+        <img src={{heatmap}} >
+    </div>
+    {% endif %}
+
+    {% if overlay %}    
+    <h3>Overlay</h3>
+    <div class="image_container">
+        <img src={{overlay}} >
+    </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}
+

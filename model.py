@@ -30,13 +30,12 @@ def save_model(model, save_path):
         'model': model.state_dict(),
         'model_args': model.model_args,
     }
-    print(f"saving to: {save_path}")
     torch.save(data, save_path)
 
 
 def load_model(path, device):
     data = torch.load(path, map_location=torch.device(device))
-    model = FunnyNet(**data['model_args']).to(device)
+    model = SegmentationModel(**data['model_args']).to(device)
     model.load_state_dict(data['model'])
     return model
 
@@ -60,15 +59,14 @@ class DoubleConv(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, 
                 stride=1, padding=1, activation=None):
         super().__init__()
-        act_func = get_act(activation)
         bias = False if activation else True
         self.double_conv = nn.Sequential(
             nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size, stride=stride, padding=padding, bias=bias),
             nn.BatchNorm2d(out_channels),
-            act_func,
+            get_act(activation),
             nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size, stride=1, padding=padding, bias=bias),
             nn.BatchNorm2d(out_channels),
-            act_func
+            get_act(activation)
         )
 
     def forward(self, x):
@@ -137,16 +135,37 @@ class UNetDecoder(nn.Module):
         return self.out(x)
 
 
-class FunnyNet(nn.Module):
+class Classifier(nn.Module):
+    def __init__(self, in_channels, out_channels, activation=None):
+        super(Classifier, self).__init__()
+        self.avg = nn.AdaptiveAvgPool2d(1)
+        self.max = nn.AdaptiveMaxPool2d(1)
+        self.layer = nn.Sequential(
+            nn.Conv2d(in_channels*2, in_channels, kernel_size=1, bias=False),
+            nn.BatchNorm2d(in_channels),
+            get_act(activation),
+            nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=True),
+        )
+
+    def forward(self, x):
+        x = torch.cat([self.avg(x), self.max(x)], dim=1)
+        x = self.layer(x)
+        return x.flatten(1)
+
+
+class SegmentationModel(nn.Module):
     def __init__(self, in_channels=3, out_channels=1, filters=16, 
-                activation='relu', num_to_cat=None, mean=[0,0,0], std=[1,1,1]):
-        super(FunnyNet, self).__init__()
+                activation='relu', mean=[0,0,0], std=[1,1,1],
+                num_to_cat=None, input_size=None):
+        super(SegmentationModel, self).__init__()
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.filters = filters
         self.num_to_cat = num_to_cat
+        self.input_size = input_size
         self.model_args = {"in_channels": in_channels, "out_channels": out_channels,
-            "filters": filters, "activation": activation, "num_to_cat": num_to_cat} 
+            "filters": filters, "activation": activation, "num_to_cat": num_to_cat,
+            "input_size": input_size} 
         if type(filters) == int:
             filters = [filters, filters*2, filters*4, filters*8, filters*16]
 
@@ -155,6 +174,7 @@ class FunnyNet(nn.Module):
 
         self.encoder = UNetEncoder(in_channels, out_channels, filters, activation)
         self.decoder = UNetDecoder(out_channels, filters, activation)
+        self.classifier = Classifier(filters[-1], out_channels, activation)
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -182,28 +202,43 @@ class FunnyNet(nn.Module):
         x = self.normalize.eval()(x)
         features = self.encoder(x)
         logits = self.decoder(features)
-        return logits
+        return logits, features[-1]
+    
+    def classify(self, x):
+        self.eval()
+        with torch.no_grad():
+            x = self.normalize(x)
+            features = self.encoder(x)
+            class_logits = self.classifier(features[-1])
+            return torch.softmax(class_logits, dim=1)
     
     def predict(self, x):
         self.eval()
         with torch.no_grad():
-            logits = self.forward(x)
-            return torch.softmax(logits, dim=1)
+            x = self.normalize(x)
+            logits, encoding = self.forward(x)
+            class_logits = self.classifier(encoding)
+            return torch.softmax(logits, dim=1), torch.softmax(class_logits, dim=1)
 
 
 def train_test(model, input_size, batch_size, device):
     model.to(device).train()
     data = torch.randn(batch_size, model.in_channels, input_size, input_size).to(device)
     true_masks = torch.empty(batch_size, input_size, input_size, dtype=torch.long).random_(model.out_channels).to(device)
+    true_labels = torch.empty(batch_size, dtype=torch.long).random_(model.out_channels).to(device)
     print("data.shape :", data.shape)
     print("true_masks.shape :", true_masks.shape)
+    print("true_labels.shape :", true_labels.shape)
     opt = torch.optim.SGD(model.parameters(), lr=1e-1)
     for i in range(100):
         opt.zero_grad()
-        logits = model(data)
+        logits, encoding = model(data)
+        class_logits = model.classifier(encoding.detach())
         loss = nn.CrossEntropyLoss()(logits, true_masks)
-        print("loss={:.06f}".format(loss))
         loss.backward()
+        class_loss = nn.CrossEntropyLoss()(class_logits, true_labels)
+        class_loss.backward()
+        print("loss={:.06f}, class_loss={:.06f}".format(loss, class_loss))
         opt.step()
 
 if __name__ == "__main__":
@@ -211,24 +246,35 @@ if __name__ == "__main__":
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 
     in_channels = 3
-    out_channels = 2
-    filters = 4  # 16
+    out_channels = 5
+    filters = 16  # 16
     activation = "relu"  # relu, leaky_relu, silu, mish
 
     batch_size = 2
-    input_size = 64
+    input_size = 128
 
-    model = FunnyNet(in_channels, out_channels, filters, activation).to(device)
+    model = SegmentationModel(in_channels, out_channels, filters, activation).to(device)
 
     # train_test(model, input_size, batch_size, device)
 
     x = torch.randn(1, in_channels, input_size, input_size).to(device)
-    logits = model(x)
-    # logits = model.predict(x)
-    print(logits.shape, torch.min(logits).item(), torch.max(logits).item())
+    model.eval()  # Freeze batchnorm
+    logits, encoding = model(x)
+    print("logits :", logits.shape, torch.min(logits).item(), torch.max(logits).item())
+    print("encoding :", encoding.shape, torch.min(encoding).item(), torch.max(encoding).item())
+    class_logits = model.classifier(encoding.detach())
+    print("class_logits :", class_logits.shape, torch.min(class_logits).item(), torch.max(class_logits).item())
+    
+    ymask, ylabel = model.predict(x)
+    print("ymask :", ymask.shape, torch.min(ymask).item(), torch.max(ymask).item())
+    print("ylabel :", ylabel.shape, torch.min(ylabel).item(), torch.max(ylabel).item())
 
+    class_logits = model.classify(x)
+    print("class_logits :", class_logits.shape, torch.min(class_logits).item(), torch.max(class_logits).item())
 
     save_model(model, save_path="runs/save_test.pth")
     model2 = load_model("runs/save_test.pth", device=device)
-    logits = model2(x)
-    print(logits.shape, torch.min(logits).item(), torch.max(logits).item())
+    model2.eval()
+    logits, encoding = model2(x)
+    print("logits :", logits.shape, torch.min(logits).item(), torch.max(logits).item())
+    print("encoding :", encoding.shape, torch.min(encoding).item(), torch.max(encoding).item())

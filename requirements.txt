@@ -1,6 +1,6 @@
-numpy
 scipy
 scikit-learn
+numpy
 matplotlib
 opencv-python
 Flask

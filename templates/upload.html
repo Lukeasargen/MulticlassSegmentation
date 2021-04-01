@@ -6,7 +6,7 @@
 
 {% block body %}
 <div class="container">
-    <h1>FunnyNet</h1>
+    <h1>Classification Model</h1>
     <h2>Upload an image</h2>
     <hr>
 
@@ -31,7 +31,7 @@
     {% endif %}
 
     {% if heatmap %}
-    <h3>Heatmap of "{{cat_name}}"" Pixels</h3>
+    <h3>Heatmap of "{{cat_name}}" Pixels</h3>
     <div class="image_container">
         <img src={{heatmap}} >
     </div>

@@ -7,6 +7,7 @@ data/*
 images/*
 !images/readme/
 
+unlabeled
 
 runs/*
 !runs/LASTRUN.txt

@@ -5,8 +5,6 @@ import numpy as np
 from PIL import Image
 import torchvision.transforms as T
 
-import jpeg4py as jpeg
-
 
 def get_data(root):
 

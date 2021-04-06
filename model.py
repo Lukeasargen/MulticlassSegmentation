@@ -8,7 +8,7 @@ def get_act(name):
         return nn.ReLU(inplace=True)
     elif name == 'leaky_relu':
         return nn.LeakyReLU(negative_slope=0.2, inplace=True)
-    elif name == 'swish':
+    elif name == 'silu':
         return nn.SiLU(inplace=True)
     elif name == 'mish':
         return MishInline()

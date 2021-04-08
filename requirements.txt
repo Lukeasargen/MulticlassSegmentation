@@ -4,3 +4,5 @@ numpy
 matplotlib
 opencv-python
 Flask
+opencv-python
+albumentations

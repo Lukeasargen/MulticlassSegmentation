@@ -24,7 +24,7 @@ SAMPLE_DATA_FOLDER = 'static/samples/'
 ALLOWED_EXTENSIONS = set(['png', 'jpg', 'jpeg'])
 
 MODEL_SAVE_PATH = "runs/demo.pth"
-MODEL_SAVE_PATH = "runs/save/run00244_final.pth"
+# MODEL_SAVE_PATH = "runs/save/run00244_final.pth"
 
 CURRENT_DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 SAVE_FOLDER_PATH = os.path.join(CURRENT_DIR_PATH, SAVE_FOLDER)

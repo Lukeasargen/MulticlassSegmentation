@@ -1,6 +1,8 @@
 import os
 import glob
 
+import cv2
+from skimage import io
 import numpy as np
 from PIL import Image
 import torchvision.transforms as T
@@ -23,9 +25,18 @@ def get_data(root):
 
 
 def pil_loader(path):
+    """ loads pil image """
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
     with open(path, 'rb') as f:
         return Image.open(f).convert('RGB')
+
+
+def np_loader(path):
+    """ loads numpy array """
+    # img = cv2.imread(path)
+    # img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = io.imread(path)[:,:,:3]
+    return img
 
 
 def custom_resize(img, size):

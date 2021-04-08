@@ -35,12 +35,11 @@ def make_ensemble(paths, device):
             input_size = m.input_size
         if check == m.num_to_cat:
             print("Adding {}".format(paths[i]))
-            print("Input Size :", m.input_size)
-            print("Filters :", m.filters)
             m.to(device)
             emodels.append(m)
         else:
             print("Categories do not match : {}".format(paths[i]))
+    print("Input Size :", input_size)
     model = EnsembleModel(emodels, input_size, check)
     print(" * Ensemble loaded.")
     return model
@@ -92,10 +91,10 @@ def sort_folder(model, device, root, num=None):
 if __name__ == "__main__":
 
     root = "images/unsorted_memes"
-    num = 100
+    num = 1000
 
     model_paths = [
-        # "runs/demo.pth",
+        "runs/demo.pth",
         # "runs/save/run00218_final.pth",
         # "runs/save/run00231_final.pth",
         # "runs/save/run00244_final.pth",

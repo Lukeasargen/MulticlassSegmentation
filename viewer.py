@@ -13,10 +13,8 @@ from util import pil_loader, prepare_image, get_data
 if __name__ == "__main__":
 
     root = "data"
-    # root = r"C:\Users\LUKE_SARGEN\projects\classifier\data\subset"
-    root = r"C:\Users\LUKE_SARGEN\projects\classifier\data\nah_unsorted"
 
-    model_path = "runs/save/run00244_final.pth"
+    model_path = "runs/save/demo.pth"
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print("Device : {}".format(device))

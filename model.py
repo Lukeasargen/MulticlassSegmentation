@@ -230,7 +230,7 @@ def train_test(model, input_size, batch_size, device):
     print("true_masks.shape :", true_masks.shape)
     print("true_labels.shape :", true_labels.shape)
     opt = torch.optim.SGD(model.parameters(), lr=1e-1)
-    for i in range(100):
+    for i in range(10):
         opt.zero_grad()
         logits, encoding = model(data)
         class_logits = model.classifier(encoding.detach())
@@ -247,15 +247,15 @@ if __name__ == "__main__":
 
     in_channels = 3
     out_channels = 5
-    filters = 16  # 16
-    activation = "relu"  # relu, leaky_relu, silu, mish
+    filters = 8  # 16
+    activation = "silu"  # relu, leaky_relu, silu, mish
 
     batch_size = 2
     input_size = 128
 
     model = SegmentationModel(in_channels, out_channels, filters, activation).to(device)
 
-    # train_test(model, input_size, batch_size, device)
+    train_test(model, input_size, batch_size, device)
 
     x = torch.randn(1, in_channels, input_size, input_size).to(device)
     model.eval()  # Freeze batchnorm

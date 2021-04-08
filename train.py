@@ -49,6 +49,7 @@ if __name__ == "__main__":
     torch.manual_seed(MANUAL_SEED)
     torch.cuda.manual_seed(MANUAL_SEED)
     torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False
 
     save_epochs = True  # Write a single copy that gets updated every epoch, like a checkpoint that gets overwritten each epoch
     graph_metrics = True
@@ -60,7 +61,7 @@ if __name__ == "__main__":
     activation = "silu"  # relu, leaky_relu, silu, mish
 
     # Training Hyperparameters
-    input_size = 256
+    input_size = 128
     num_epochs = 800
 
     # Dataloader parameters
@@ -80,7 +81,7 @@ if __name__ == "__main__":
     scheduler_type = 'plateau'  # step, plateau, exp
     lr_milestones = [150, 180]  # for step
     lr_gamma = 0.6
-    plateau_patience = 50
+    plateau_patience = 40
     use_classifer_grad = True  # Uses the classifer gradients to update the encoder
 
     # Dataset parameters
@@ -95,7 +96,7 @@ if __name__ == "__main__":
         # Spatial transforms
         A.HorizontalFlip(p=0.5),
         A.VerticalFlip(p=0.5),
-        A.Rotate(limit=25, p=0.5, border_mode=cv2.BORDER_CONSTANT),
+        A.Rotate(limit=25, p=0.25, border_mode=cv2.BORDER_CONSTANT),
         # A.RandomRotate90(p=1.0),
     #     A.OneOf([
     #         A.OpticalDistortion(distort_limit=0.05, shift_limit=0.0, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, always_apply=True, p=0.5),
@@ -105,10 +106,10 @@ if __name__ == "__main__":
         # Color transforms
         A.OneOf([
             A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, always_apply=True, p=0.5),
-            # A.Posterize(num_bits=[4,6], always_apply=True, p=0.5),
+            A.Posterize(num_bits=[4,6], always_apply=True, p=0.5),
             A.RGBShift(r_shift_limit=25, g_shift_limit=25, b_shift_limit=25, always_apply=True, p=0.5),
-            # A.RandomGamma(gamma_limit=(50, 150), always_apply=True, p=0.5),
-       ], p=0.5),
+            A.RandomGamma(gamma_limit=(50, 150), always_apply=True, p=0.5),
+       ], p=0.3),
         A.RandomShadow(shadow_roi=(0, 0.0, 1, 1), num_shadows_lower=1, num_shadows_upper=2, shadow_dimension=3, always_apply=False, p=0.5),
         # Blurring and sharpening
         A.OneOf([
@@ -116,11 +117,11 @@ if __name__ == "__main__":
             # A.GaussianBlur(blur_limit=(1, 7), always_apply=True, p=0.5),
             A.GaussNoise(var_limit=100.0, mean=0, always_apply=True, p=0.5),
             # A.GlassBlur(sigma=0.7, max_delta=4, iterations=1, always_apply=True, mode='fast', p=0.5),
-            # A.ISONoise(color_shift=(0.01, 0.05), intensity=(0.1, 0.5), always_apply=True, p=0.5),
+            A.ISONoise(color_shift=(0.01, 0.05), intensity=(0.1, 0.5), always_apply=True, p=0.5),
             # A.MedianBlur(blur_limit=5, always_apply=True, p=0.5),
-            # A.MotionBlur(blur_limit=5, p=1.0),
-        ], p=0.5),
-        A.ToGray(p=0.1),
+            A.MotionBlur(blur_limit=5, p=1.0),
+        ], p=0.3),
+        A.ToGray(p=0.2),
         ToTensorV2(),
     ])
     val_transforms = A.Compose([

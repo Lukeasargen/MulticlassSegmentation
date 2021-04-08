@@ -10,12 +10,11 @@ from util import get_data, np_loader
 if __name__ == "__main__":
 
     root = "data"
-    root = r"C:\Users\LUKE_SARGEN\projects\classifier\data\subset"
 
     path_list, label_list, num_to_cat = get_data(root)
     print("Total images :", len(path_list))
 
-    input_size = 256
+    input_size = 128
 
     train_transforms = A.Compose([
         # Resizing

@@ -14,7 +14,7 @@ if __name__ == "__main__":
 
     root = "data"
 
-    model_path = "runs/save/demo.pth"
+    model_path = "runs/demo.pth"
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
     print("Device : {}".format(device))
@@ -25,9 +25,10 @@ if __name__ == "__main__":
     path_list, label_list, num_to_cat = get_data(root)
     print("Total images :", len(path_list))
 
-    rows = 4
+    rows = 3
+    scale = 3
 
-    fig, ax = plt.subplots(rows, 1+model.out_channels, figsize=(2*(1+model.out_channels), 2*rows))  # w, h
+    fig, ax = plt.subplots(rows, 1+model.out_channels, figsize=(scale*(1+model.out_channels), scale*rows))  # w, h
     idxs = np.random.choice(range(len(path_list)), rows, replace=False)
     for i in range(rows):
         img_path = path_list[idxs[i]]

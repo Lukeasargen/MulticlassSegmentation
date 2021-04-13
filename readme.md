@@ -26,6 +26,12 @@ The model is the original UNet with an additional classifier on the last output 
 
 # How to train
 
+
+Activate your conda environment
+```
+conda activate pytorch
+```
+
 **You have to change the training parameters in train.py** I'm to lazy to setup cli args so you have to change the parameters in the file. This works well for me since I just train on a local machine and usually have the IDE open anyway. Most parameter names are obvious, but if you can't tell what something is doing you should just explore the code; it's pretty short and simple. The first 150 or so lines setup the data, dataloaders, model, optmizer, scheduler, etc., the next 100 lines is the training loop, and the rest uses matplotlib to graph the metrics and visualize a few validation images.
 
 Setup your `data_root` folder like this:

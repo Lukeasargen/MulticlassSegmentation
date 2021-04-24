@@ -91,10 +91,14 @@ def sort_folder(model, device, root, num=None):
 if __name__ == "__main__":
 
     root = "images/unsorted_memes"
-    num = 100
+    root = r"C:\Users\LUKE_SARGEN\projects\classifier\data\nah_unsorted"
+    num = 1000
 
     model_paths = [
-        "runs/demo.pth",
+        # "runs/demo.pth",
+        # "runs/save/run00218_final.pth",
+        # "runs/save/run00231_final.pth",
+        "runs/save/run00244_final.pth",
         ]
 
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')

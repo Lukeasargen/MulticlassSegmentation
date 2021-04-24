@@ -139,17 +139,15 @@ class Classifier(nn.Module):
     def __init__(self, in_channels, out_channels, activation=None):
         super(Classifier, self).__init__()
         self.avg = nn.AdaptiveAvgPool2d(1)
-        self.max = nn.AdaptiveMaxPool2d(1)
         self.layer = nn.Sequential(
-            nn.Conv2d(in_channels*2, in_channels, kernel_size=1, bias=False),
-            nn.BatchNorm2d(in_channels),
-            get_act(activation),
+            # nn.Conv2d(in_channels, in_channels, kernel_size=1, bias=False),
+            # nn.BatchNorm2d(in_channels),
+            # get_act(activation),
             nn.Conv2d(in_channels, out_channels, kernel_size=1, bias=True),
         )
 
     def forward(self, x):
-        x = torch.cat([self.avg(x), self.max(x)], dim=1)
-        x = self.layer(x)
+        x = self.layer(self.avg(x))
         return x.flatten(1)
 
 

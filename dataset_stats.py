@@ -28,6 +28,6 @@ if __name__ == "__main__":
             t2 = time.time()
             print("{}/{} measured. Total time={:.2f}s. Images per second {:.2f}.".format(i+1, n, t2-t0, 100/(t2-t1)))
             t1 = t2
-    print("mean :", mean/n)
+    print("set_mean = [{:4.3f}, {:4.3f}, {:4.3f}]".format(*(mean/n)))
+    print("set_std = [{:4.3f}, {:4.3f}, {:4.3f}]".format(*np.sqrt(var/n)))
     print("var :", var/n)
-    print("std :", np.sqrt(var/n))

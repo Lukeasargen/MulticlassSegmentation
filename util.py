@@ -76,3 +76,16 @@ def time_to_string(t):
     if t > 60: return "{:.2f} minutes".format(t/60)
     else: return "{:.2f} seconds".format(t)
 
+
+"""https://discuss.pytorch.org/t/weight-decay-in-the-optimizers-is-a-bad-idea-especially-with-batchnorm/16994/3"""
+def add_weight_decay(module, weight_decay):
+    decay = []
+    no_decay = []
+    for name, param in module.named_parameters():
+        if param.requires_grad:
+            if len(param.shape) == 1:
+                no_decay.append(param)
+            else:
+                decay.append(param)
+    return [{'params': no_decay, 'weight_decay': 0.0},
+            {'params': decay, 'weight_decay': weight_decay}]

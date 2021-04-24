@@ -15,7 +15,7 @@ from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T
 
 from model import SegmentationModel, save_model
-from util import time_to_string, prepare_image, get_data, pil_loader, np_loader
+from util import time_to_string, prepare_image, get_data, pil_loader, np_loader, add_weight_decay
 
 
 class FolderDataset(Dataset):
@@ -36,7 +36,7 @@ class FolderDataset(Dataset):
             img = self.data[idx]
         else:
             img = np_loader(self.data[idx])
-        img = self.transforms(image=img)["image"].float()
+        img = self.transforms(image=img)["image"] / 255.0
         label = self.labels[idx]
         mask = torch.empty(img.shape[1], img.shape[2], dtype=torch.long).fill_(label)
         target = torch.tensor((label), dtype=torch.long)
@@ -54,6 +54,7 @@ if __name__ == "__main__":
     save_epochs = True  # Write a single copy that gets updated every epoch, like a checkpoint that gets overwritten each epoch
     graph_metrics = True
     view_results = True
+    checkpoint_epoch = 50  # epoch save interval
 
     # Model Config
     in_channels = 3
@@ -61,67 +62,66 @@ if __name__ == "__main__":
     activation = "silu"  # relu, leaky_relu, silu, mish
 
     # Training Hyperparameters
-    input_size = 128
-    num_epochs = 800
+    input_size = 192
+    num_epochs = 500
 
     # Dataloader parameters
-    batch_size = 32
+    batch_size = 64
     shuffle = True
     num_workers = 6
     drop_last = False
-    pin_memory = False
-    prefetch_factor = 2
+    pin_memory = True
 
     # Optimization
     optim_type = 'adamw'  # sgd 1e-5, adam 4e-4, adamw 4e-4
-    base_lr = 1e-3
+    base_lr = 4e-4
     momentum = 0.9
     nesterov = True
-    weight_decay = 1e-4  # 0, 1e-5, 3e-5, *1e-4, 3e-4, *5e-4, 3e-4, 1e-3, 1e-2
+    weight_decay = 1e-5  # 0, 1e-5, 3e-5, *1e-4, 3e-4, *5e-4, 3e-4, 1e-3, 1e-2
     scheduler_type = 'plateau'  # step, plateau, exp
     lr_milestones = [150, 180]  # for step
-    lr_gamma = 0.6
-    plateau_patience = 40
+    lr_gamma = 0.4
+    plateau_patience = 50
     use_classifer_grad = True  # Uses the classifer gradients to update the encoder
 
     # Dataset parameters
-    data_root = "data"
-    validation_split = 0.0419  # percent used for validation as a decimal, only if the data root has no val folder
+    data_root = "data/memes256"
+    validation_split = 0.1049  # percent used for validation as a decimal
     load_in_ram = False  # can speed up small datasets <2000 images, num_workers=0
-    set_mean = [0.5, 0.5, 0.5]
-    set_std = [0.5, 0.5, 0.5]
+    set_mean = [0.543, 0.511, 0.495]
+    set_std = [0.285, 0.283, 0.285]
     train_transforms = A.Compose([
         # Resizing
-        A.RandomResizedCrop(input_size, input_size, scale=(0.08, 1.0), ratio=(3./4., 4./3.), interpolation=cv2.INTER_LINEAR),
+        A.RandomResizedCrop(input_size, input_size, scale=(0.5, 1.0), ratio=(3./4., 4./3.), interpolation=cv2.INTER_LINEAR),
         # Spatial transforms
         A.HorizontalFlip(p=0.5),
-        A.VerticalFlip(p=0.5),
-        A.Rotate(limit=25, p=0.25, border_mode=cv2.BORDER_CONSTANT),
-        # A.RandomRotate90(p=1.0),
-    #     A.OneOf([
-    #         A.OpticalDistortion(distort_limit=0.05, shift_limit=0.0, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, always_apply=True, p=0.5),
-    #         A.GridDistortion(num_steps=5, distort_limit=0.3, interpolation=cv2.INTER_LINEAR, border_mode=cv2.BORDER_CONSTANT, always_apply=True, p=0.5),
-    #         A.IAAPerspective(scale=(0.05, 0.1), keep_size=True, always_apply=True, p=0.5),
-    #    ], p=0.5),
+        # A.VerticalFlip(p=0.5),
+        A.Rotate(limit=30, p=0.5),
+        # A.RandomRotate90(p=0.25),
+        # A.OneOf([
+        #     # A.GridDistortion(num_steps=5, distort_limit=0.03, always_apply=True),
+        #     A.IAAPerspective(scale=(0.05, 0.1), keep_size=True, always_apply=True),
+        #     A.IAAAffine(shear=(-15, 15), always_apply=True),
+        # ], p=1.0),
         # Color transforms
         A.OneOf([
-            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, always_apply=True, p=0.5),
-            A.Posterize(num_bits=[4,6], always_apply=True, p=0.5),
-            A.RGBShift(r_shift_limit=25, g_shift_limit=25, b_shift_limit=25, always_apply=True, p=0.5),
-            A.RandomGamma(gamma_limit=(50, 150), always_apply=True, p=0.5),
-       ], p=0.3),
-        A.RandomShadow(shadow_roi=(0, 0.0, 1, 1), num_shadows_lower=1, num_shadows_upper=2, shadow_dimension=3, always_apply=False, p=0.5),
+            A.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2, hue=0.1, always_apply=True),
+            # A.Posterize(num_bits=[4,6], always_apply=True),
+            A.RGBShift(r_shift_limit=25, g_shift_limit=25, b_shift_limit=25, always_apply=True),
+            A.RandomGamma(gamma_limit=(50, 150), always_apply=True),
+            A.ToGray(p=0.4),
+       ], p=0.5),
         # Blurring and sharpening
         A.OneOf([
-            A.IAASharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0), always_apply=True, p=0.5),
-            # A.GaussianBlur(blur_limit=(1, 7), always_apply=True, p=0.5),
-            A.GaussNoise(var_limit=100.0, mean=0, always_apply=True, p=0.5),
-            # A.GlassBlur(sigma=0.7, max_delta=4, iterations=1, always_apply=True, mode='fast', p=0.5),
-            A.ISONoise(color_shift=(0.01, 0.05), intensity=(0.1, 0.5), always_apply=True, p=0.5),
-            # A.MedianBlur(blur_limit=5, always_apply=True, p=0.5),
-            A.MotionBlur(blur_limit=5, p=1.0),
-        ], p=0.3),
-        A.ToGray(p=0.2),
+            A.IAASharpen(alpha=(0.2, 0.5), lightness=(0.5, 1.0), always_apply=True),
+            A.GaussianBlur(blur_limit=(1, 5), always_apply=True),
+            # A.GlassBlur(sigma=0.7, max_delta=4, iterations=1, always_apply=True, mode='fast'),
+            A.ISONoise(color_shift=(0.01, 0.05), intensity=(0.1, 0.5), always_apply=True),
+            # A.MedianBlur(blur_limit=5, always_apply=True),
+            # A.MotionBlur(blur_limit=3, always_apply=True),
+            # A.RandomShadow(shadow_roi=(0, 0.0, 1, 1), num_shadows_lower=1, num_shadows_upper=2, shadow_dimension=3, always_apply=True),    
+        ], p=0.5),
+        A.GaussNoise(var_limit=5.0, mean=0, p=1.0),
         ToTensorV2(),
     ])
     val_transforms = A.Compose([
@@ -157,10 +157,10 @@ if __name__ == "__main__":
     print(" * Creating dataloaders...")
     train_loader = DataLoader(dataset=train_dataset, batch_size=batch_size ,shuffle=shuffle,
             num_workers=num_workers, drop_last=drop_last, persistent_workers=(True if num_workers > 0 else False),
-            pin_memory=pin_memory, prefetch_factor=prefetch_factor)
+            pin_memory=pin_memory)
     val_loader = DataLoader(dataset=val_dataset, batch_size=batch_size ,shuffle=False,
             num_workers=num_workers, drop_last=drop_last, persistent_workers=(True if num_workers > 0 else False),
-            pin_memory=pin_memory, prefetch_factor=prefetch_factor)
+            pin_memory=pin_memory)
 
     """ Setup the model, optimizer, and scheduler """
     device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
@@ -170,16 +170,19 @@ if __name__ == "__main__":
     model = SegmentationModel(in_channels, num_cat, filters, activation, set_mean, set_std,
                 num_to_cat=num_to_cat, input_size=input_size).to(device)
 
-    # TODO : group params, no weight decay on batch norm
+    if weight_decay != 0:
+        params = add_weight_decay(model, weight_decay)
+    else:
+        params = model.parameters()
 
     # Setup optimizer
     print(" * Creating optimizer...")
     if optim_type == 'sgd':
-        optimizer = optim.SGD(model.parameters(), lr=base_lr, momentum=momentum, nesterov=nesterov, weight_decay=weight_decay)
+        optimizer = optim.SGD(params, lr=base_lr, momentum=momentum, nesterov=nesterov, weight_decay=weight_decay)
     elif optim_type == 'adam':
-        optimizer = optim.Adam(model.parameters(), lr=base_lr)
+        optimizer = optim.Adam(params, lr=base_lr)
     elif optim_type == 'adamw':
-        optimizer = optim.AdamW(model.parameters(), lr=base_lr, weight_decay=weight_decay)
+        optimizer = optim.AdamW(params, lr=base_lr, weight_decay=weight_decay)
     
     # Setup scheduler
     print(" * Creating scheduler...")
@@ -262,15 +265,15 @@ if __name__ == "__main__":
                 class_logits = model.classifier(encoding)
                 loss = criterion(logits, true_masks)
                 class_loss = criterion(class_logits, true_labels)
-            # Update running metrics
-            val_seg_loss_total += loss
-            val_cla_loss_total += class_loss
-            _, tags = torch.max(logits, dim=1)
-            val_seg_correct_total += (tags == true_masks).sum()
-            val_seg_seen_total += true_masks.numel()
-            _, tags = torch.max(class_logits, dim=1)
-            val_cla_correct_total += (tags == true_labels).sum()
-            val_cla_seen_total += true_labels.numel()
+                # Update running metrics
+                val_seg_loss_total += loss
+                val_cla_loss_total += class_loss
+                _, tags = torch.max(logits, dim=1)
+                val_seg_correct_total += (tags == true_masks).sum()
+                val_seg_seen_total += true_masks.numel()
+                _, tags = torch.max(class_logits, dim=1)
+                val_cla_correct_total += (tags == true_labels).sum()
+                val_cla_seen_total += true_labels.numel()
 
         # EPOCH TRAIN AND VALIDATE
         train_loss = (train_seg_loss_total+train_cla_loss_total)/len(train_loader)
@@ -312,8 +315,10 @@ if __name__ == "__main__":
                 scheduler.step()
 
         if save_epochs:
-            save_model(model, save_path(current_run, "check"))
+            save_model(model, save_path(current_run, "latest"))
         
+        if (epoch+1) % checkpoint_epoch == 0:
+            save_model(model, save_path(current_run, f"check{epoch+1}"))
 
     print('Finished Training. Duration={}. {} iterations'.format(time_to_string(time.time()-t1), iterations))
 

@@ -54,7 +54,7 @@ if __name__ == "__main__":
     save_epochs = True  # Write a single copy that gets updated every epoch, like a checkpoint that gets overwritten each epoch
     graph_metrics = True
     view_results = True
-    checkpoint_epoch = 50  # epoch save interval
+    checkpoint_epoch = 10  # epoch save interval
 
     # Model Config
     in_channels = 3
@@ -62,8 +62,8 @@ if __name__ == "__main__":
     activation = "silu"  # relu, leaky_relu, silu, mish
 
     # Training Hyperparameters
-    input_size = 192
-    num_epochs = 500
+    input_size = 96
+    num_epochs = 300
 
     # Dataloader parameters
     batch_size = 64
@@ -77,19 +77,21 @@ if __name__ == "__main__":
     base_lr = 4e-4
     momentum = 0.9
     nesterov = True
-    weight_decay = 1e-5  # 0, 1e-5, 3e-5, *1e-4, 3e-4, *5e-4, 3e-4, 1e-3, 1e-2
+    weight_decay = 5e-4  # 0, 1e-5, 3e-5, *1e-4, 3e-4, *5e-4, 3e-4, 1e-3, 1e-2
     scheduler_type = 'plateau'  # step, plateau, exp
     lr_milestones = [150, 180]  # for step
     lr_gamma = 0.4
-    plateau_patience = 50
+    plateau_patience = 30
     use_classifer_grad = True  # Uses the classifer gradients to update the encoder
+    class_multi = 1.0
+    cutmix_beta = 0.0
 
     # Dataset parameters
-    data_root = "data/memes256"
-    validation_split = 0.1049  # percent used for validation as a decimal
+    # data_root = "data/memes256"
+    validation_split = 0.10  # percent used for validation as a decimal
     load_in_ram = False  # can speed up small datasets <2000 images, num_workers=0
-    set_mean = [0.543, 0.511, 0.495]
-    set_std = [0.285, 0.283, 0.285]
+    set_mean = [0.529, 0.488, 0.460]
+    set_std = [0.256, 0.245, 0.253]
     train_transforms = A.Compose([
         # Resizing
         A.RandomResizedCrop(input_size, input_size, scale=(0.5, 1.0), ratio=(3./4., 4./3.), interpolation=cv2.INTER_LINEAR),
@@ -231,12 +233,46 @@ if __name__ == "__main__":
             true_masks = true_masks.to(device)
             true_labels = true_labels.to(device)
             optimizer.zero_grad()
-            logits, encoding = model(data)
-            loss = criterion(logits, true_masks)
-            encoding = encoding if use_classifer_grad else encoding.detach()
-            class_logits = model.classifier(encoding)
-            class_loss = criterion(class_logits, true_labels)
-            (loss+class_loss).backward()
+
+            if cutmix_beta > 0:
+                cutmix_beta = 1.0
+                lam = np.random.beta(cutmix_beta, cutmix_beta)
+                rand_index = torch.randperm(data.size()[0]).to(data.device)
+                target_a = true_labels
+                target_b = true_labels[rand_index]
+                # Now the bboxes for the input and mask
+                _, _, w, h = data.size()
+                cut_rat = np.sqrt(1. - lam)
+                # Box size
+                cut_w, cut_h = int(w*cut_rat), int(h*cut_rat)
+                # Box center
+                cx, cy = np.random.randint(w), np.random.randint(h)
+                bbx1 = np.clip(cx - cut_w // 2, 0, w)
+                bbx2 = np.clip(cx + cut_w // 2, 0, w)
+                bby1 = np.clip(cy - cut_h // 2, 0, h)
+                bby2 = np.clip(cy + cut_h // 2, 0, h)
+                data[:, :, bbx1:bbx2, bby1:bby2] = data[rand_index, :, bbx1:bbx2, bby1:bby2]
+                true_masks[:, bbx1:bbx2, bby1:bby2] = true_masks[rand_index, bbx1:bbx2, bby1:bby2]
+                # Adjust the classification loss based on pixel area ratio
+                lam = 1 - ((bbx2 - bbx1) * (bby2 - bby1) / (w*h))
+                # Segmentation Pass
+                logits, encoding = model(data)
+                loss = criterion(logits, true_masks)
+                # Classify Pass
+                encoding = encoding if use_classifer_grad else encoding.detach()
+                class_logits = model.classifier(encoding)
+                class_loss = criterion(class_logits, target_a)*lam + criterion(class_logits, target_b)*(1.0-lam)
+            else:
+                # Segmentation Pass
+                logits, encoding = model(data)
+                loss = criterion(logits, true_masks)
+                # Classify Pass
+                encoding = encoding if use_classifer_grad else encoding.detach()
+                class_logits = model.classifier(encoding)
+                class_loss = criterion(class_logits, true_labels)
+
+            (loss+class_multi*class_loss).backward()
+
             optimizer.step()
             iterations += 1
             # Update running metrics
@@ -306,7 +342,7 @@ if __name__ == "__main__":
 
         duration = time.time()-t2
         remaining = duration*(num_epochs-epoch-1)
-        print("epoch {}. {} iters: {}. loss={:.04f}. s={:.2f}%. c={:.2f}%. lr={:.06f}. elapsed={}. remaining={}.".format(epoch+1, iterations, time_to_string(duration), train_loss, train_seg_acc, train_cla_acc, optimizer.param_groups[0]['lr'], time_to_string(time.time()-t1), time_to_string(remaining)))
+        print("epoch {}. {}. loss={:.3f}. s={:.1f}/{:.1f}. c={:.1f}/{:.1f}. lr={:.06f}. elapsed={}. remaining={}.".format(epoch+1, time_to_string(duration), train_loss, train_seg_acc, val_seg_acc, train_cla_acc, val_cla_acc, optimizer.param_groups[0]['lr'], time_to_string(time.time()-t1), time_to_string(remaining)))
 
         if scheduler:
             if type(scheduler) == optim.lr_scheduler.ReduceLROnPlateau:

@@ -48,7 +48,9 @@ def custom_resize(img, size):
     return img
 
 
-def prepare_image(img, size=None):
+def prepare_image(img, size=None, square=False):
+    if square:
+        img = crop_max_square(img)
     if size:
         img = custom_resize(img, size)
     return T.ToTensor()(img).unsqueeze_(0)
